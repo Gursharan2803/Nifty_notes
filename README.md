@@ -53,16 +53,16 @@ NIFTy answers one question: given noisy, incomplete data d, what do we know abou
 
 ### The four objects
 
-```latex
+$$
 P(s \mid d) \;=\; \frac{P(d \mid s)\,P(s)}{P(d)}
-```
+$$
 
 | Object | Name | Plain meaning | In NIFTy |
 | --- | --- | --- | --- |
-| P(s) | **Prior** | What you believe about s before seeing data: smoothness, positivity, typical size | A model s(ξ) with ξ \~ N(0, 1): `jft.NormalPrior`, `jft.LogNormalPrior`, `jft.CorrelatedFieldMaker` |
-| P(d \| s) | **Likelihood** | How probable the observed data are if the truth were s; encodes the instrument (response) and the noise | `jft.Gaussian`, `jft.Poissonian`, `jft.VariableCovarianceGaussian`, `jft.StudentT` |
-| P(s \| d) | **Posterior** | Updated belief after the data: the answer | Samples returned by `jft.optimize_kl` |
-| P(d) | **Evidence** | Normalisation; how well a whole model explains the data | ELBO via `jft.estimate_evidence_lower_bound` |
+| $P(s)$ | **Prior** | What you believe about $s$ before seeing data: smoothness, positivity, typical size | A model $s(\xi)$ with $\xi \sim \mathcal{N}(0, 1)$: `jft.NormalPrior`, `jft.LogNormalPrior`, `jft.CorrelatedFieldMaker` |
+| $P(d \mid s)$ | **Likelihood** | How probable the observed data are if the truth were $s$; encodes the instrument (response) and the noise | `jft.Gaussian`, `jft.Poissonian`, `jft.VariableCovarianceGaussian`, `jft.StudentT` |
+| $P(s \mid d)$ | **Posterior** | Updated belief after the data: the answer | Samples returned by `jft.optimize_kl` |
+| $P(d)$ | **Evidence** | Normalisation; how well a whole model explains the data | ELBO via `jft.estimate_evidence_lower_bound` |
 
 **Worked example (notebook 00, §1).** A positive brightness s has a log-normal prior centred at 2. Three measurements around 3.1 with noise σ = 0.8 give a likelihood peaked near 3.3. The posterior sits between, closer to the data because three measurements carry more information than the broad prior. Multiply the curves pointwise, normalise — that is Bayes.
 
@@ -70,15 +70,15 @@ P(s \mid d) \;=\; \frac{P(d \mid s)\,P(s)}{P(d)}
 
 NIFTy works with negative log-probabilities, borrowed from statistical physics:
 
-```latex
+$$
 \mathcal{H}(d, s) = -\ln P(d, s) = \underbrace{-\ln P(d \mid s)}_{\text{likelihood energy}} \; \underbrace{- \ln P(s)}_{\text{prior energy}}, \qquad P(s \mid d) \propto e^{-\mathcal{H}(d,s)}
-```
+$$
 
 Minimising ℋ = maximising the posterior. Products of probabilities become sums of energies, which is what optimizers and autodiff like. For Gaussian noise the likelihood energy is the familiar ½ χ²:
 
-```latex
+$$
 \mathcal{H}(d \mid s) = \tfrac12 \big(d - R(s)\big)^{\dagger} N^{-1} \big(d - R(s)\big) + \text{const}
-```
+$$
 
 In code, `jft.Gaussian(d, noise_cov_inv).amend(model)` *is* this function of the latent parameters; NIFTy adds the prior energy ½ ξ†ξ itself.
 
@@ -113,9 +113,9 @@ A **field** is a function over a continuous domain: a sky image, a 3-D dust dens
 
 Any field on a periodic grid is a sum of waves with wave numbers k:
 
-```latex
+$$
 \hat s_k = \sum_{x} s_x\, e^{-2\pi i k x / N}, \qquad s_x = \frac{1}{N}\sum_{k} \hat s_k\, e^{2\pi i k x / N}
-```
+$$
 
 - Small |k| = large-scale structure; large |k| = fine detail. In 2-D and 3-D every Fourier pixel has a **mode length** |k| = √(kx² + ky²).
 - The direct sum costs O(N²); the **Fast Fourier Transform** costs O(N log N). In notebook 00, a hand DFT on 4096 points takes about 1 s; `np.fft.fft` takes 0.2 ms.
@@ -124,26 +124,26 @@ Any field on a periodic grid is a sum of waves with wave numbers k:
 
 ### Covariance and the power spectrum
 
-A Gaussian field prior is s \~ N(0, S), with covariance S\_xy = ⟨s\_x s\_y⟩. For a 128² image S has 2.7 × 10⁸ entries — too many to store. Two physical assumptions rescue us:
+A Gaussian field prior is $s \sim \mathcal{N}(0, S)$, with covariance $S_{xy} = \langle s_x s_y \rangle$. For a 128² image $S$ has 2.7 × 10⁸ entries — too many to store. Two physical assumptions rescue us:
 
-- **Homogeneity** (statistics independent of position): S\_xy = C(x − y). Then S is a convolution, so it is **diagonal in Fourier space**. Its diagonal is the **power spectrum** P(k), the Fourier transform of the correlation function C (Wiener–Khinchin theorem).
-- **Isotropy** (no preferred direction): P depends only on |k|. An entire N × N covariance is now one 1-D curve.
+- **Homogeneity** (statistics independent of position): $S_{xy} = C(x - y)$. Then $S$ is a convolution, so it is **diagonal in Fourier space**. Its diagonal is the **power spectrum** $P(k)$, the Fourier transform of the correlation function $C$ (Wiener–Khinchin theorem).
+- **Isotropy** (no preferred direction): $P$ depends only on $|k|$. An entire $N \times N$ covariance is now one 1-D curve.
 
-```latex
+$$
 S = F^{\dagger}\, \mathrm{diag}\!\big(P(|k|)\big)\, F
-```
+$$
 
 Steep spectra (P ∝ k⁻⁴) give smooth fields; flat spectra give noise-like fields. NIFTy groups Fourier pixels into shells of equal |k|; the **power distributor** maps a 1-D spectrum onto the full Fourier grid (`grid.harmonic_grid.power_distributor` in `nifty.re`, `ift.PowerDistributor` in `nifty.cl`).
 
 ### Gaussian random fields and standardization
 
-If ξ \~ N(0, 𝟙) then A ξ \~ N(0, A A†). Choosing A = F⁻¹ diag(√P) gives a correlated field in three steps: draw white noise, multiply by the **amplitude spectrum** A(k) = √P(k), transform back. Cost: one FFT.
+If $\xi \sim \mathcal{N}(0, \mathbb{1})$ then $A\xi \sim \mathcal{N}(0, A A^{\dagger})$. Choosing $A = F^{-1}\operatorname{diag}(\sqrt{P})$ gives a correlated field in three steps: draw white noise, multiply by the **amplitude spectrum** $A(k) = \sqrt{P(k)}$, transform back. Cost: one FFT.
 
 This is **standardization**, the single most important idea in NIFTy: every prior is written as a deterministic function of standard-normal latent variables,
 
-```latex
+$$
 s = s(\xi), \qquad \xi \sim \mathcal{N}(0, \mathbb{1}), \qquad \text{scalar case: } s(\xi) = \mathrm{CDF}^{-1}_{P(s)}\big(\mathrm{CDF}_{\mathcal{N}}(\xi)\big)
-```
+$$
 
 Why NIFTy insists on it:
 
@@ -174,17 +174,17 @@ Every NIFTy algorithm is built from three solvers: conjugate gradient for linear
 
 NIFTy replaces the Hessian by the **Fisher information metric** of the likelihood plus the identity from the standardized prior:
 
-```latex
+$$
 M(\xi) = J(\xi)^{\dagger}\, N^{-1}\, J(\xi) + \mathbb{1}, \qquad J = \frac{\partial R(s(\xi))}{\partial \xi}
-```
+$$
 
 M is always positive definite (CG works) and needs only Jacobian-vector products, which JAX provides (`lh.metric(x, v)` in `nifty.re`). In `optimize_kl` you control these solvers through `cg_kwargs` (`absdelta`, `maxiter`) and `minimize_kwargs` (`xtol`, `maxiter`); in `nifty.cl` through controllers such as `ift.AbsDeltaEnergyController` and `ift.GradientNormController`.
 
 ### The measurement equation
 
-```latex
+$$
 d = R(s) + n
-```
+$$
 
 - **Response R**: everything the instrument does — masking, blurring by a point-spread function, line-of-sight integration, Fourier sampling in interferometry, exposure.
 - **Noise n**: here Gaussian with covariance N; for photon counts the likelihood is Poisson instead.
@@ -192,16 +192,16 @@ d = R(s) + n
 
 ### The Wiener filter
 
-For a Gaussian prior s \~ N(0, S), linear response R and Gaussian noise N, the posterior is exactly Gaussian:
+For a Gaussian prior $s \sim \mathcal{N}(0, S)$, linear response $R$ and Gaussian noise $N$, the posterior is exactly Gaussian:
 
-```latex
+$$
 P(s \mid d) = \mathcal{N}(s;\, m, D), \qquad D = \big(S^{-1} + R^{\dagger} N^{-1} R\big)^{-1}, \qquad m = D\, j, \qquad j = R^{\dagger} N^{-1} d
-```
+$$
 
 - **j**, the *information source*: data back-projected into signal space and weighted by noise.
 - **D**, the *information propagator*: the posterior covariance. Its inverse is prior precision plus data precision.
 - The posterior mean m is found by solving D⁻¹ m = j with CG — D itself is never built.
-- **Posterior samples** without forming D: draw η with covariance D⁻¹ (η = S^(−1/2) ξ₁ + R† N^(−1/2) ξ₂), solve D⁻¹ y = η, then m + y is a sample. MGVI draws its samples the same way.
+- **Posterior samples** without forming $D$: draw $\eta$ with covariance $D^{-1}$ ($\eta = S^{-1/2}\xi_1 + R^{\dagger}N^{-1/2}\xi_2$), solve $D^{-1}y = \eta$, then $m + y$ is a sample. MGVI draws its samples the same way.
 
 What to expect (notebook 02): in observed regions the mean follows the data and the std is small; in gaps the mean relaxes to the prior mean and the std grows towards the prior std, largest in the middle of a gap. About 68% of pixels lie within 1σ of the truth — the calibration check (notebook 02 measured 67.4%).
 
@@ -219,11 +219,11 @@ The correlated field model infers the field **and** its power spectrum jointly, 
 
 ### Construction
 
-```latex
+$$
 \phi(x) = \mu + \sigma_0\, \xi_0 + \frac{1}{V}\, \mathcal{H}\big[\, A_\theta(|k|)\, \xi_k \big](x), \qquad \ln A_\theta(k) \propto \alpha \ln k + \eta\; \mathrm{IWP}(\ln k)
-```
+$$
 
-The amplitude spectrum A is normalised so that the field's standard deviation equals the `fluctuations` parameter. All ingredients — ξ\_k, ξ₀ and the spectral parameters θ — are standard-normal latents, so one inference handles everything.
+The amplitude spectrum A is normalised so that the field's standard deviation equals the `fluctuations` parameter. All ingredients — $\xi_k$, $\xi_0$ and the spectral parameters $\theta$ — are standard-normal latents, so one inference handles everything.
 
 | Parameter `(mean, std)` | Prior type | Controls | What you see when you raise it |
 | --- | --- | --- | --- |
@@ -271,24 +271,24 @@ For non-linear models the posterior is not Gaussian and cannot be computed exact
 
 Pick a tractable family Q and make it as close as possible to the true posterior P:
 
-```latex
+$$
 \mathrm{KL}(Q \,\|\, P) = \int Q(\xi) \ln \frac{Q(\xi)}{P(\xi \mid d)}\, d\xi = \big\langle \mathcal{H}(d, \xi) \big\rangle_{Q} - \mathrm{entropy}(Q) + \ln P(d)
-```
+$$
 
-Minimising KL is equivalent to maximising the **ELBO** = ⟨ln P(d, ξ)⟩\_Q + entropy(Q) ≤ ln P(d). That inequality is why the ELBO doubles as a model-comparison score.
+Minimising KL is equivalent to maximising the **ELBO** $= \langle \ln P(d, \xi) \rangle_Q + \mathrm{entropy}(Q) \le \ln P(d)$. That inequality is why the ELBO doubles as a model-comparison score.
 
 ### MGVI — Metric Gaussian Variational Inference
 
-1. Approximate Q = N(ξ̄, M(ξ̄)⁻¹): the covariance is *not* a free parameter; it is the inverse Fisher metric at the mean. This is what makes MGVI scale to 10⁹ parameters.
-2. Draw samples δξᵢ \~ N(0, M⁻¹) with one CG solve each (as in the Wiener filter), and use **antithetic pairs** ξ̄ ± δξᵢ: they cancel odd moments and halve the noise of the KL estimate. `n_samples=20` gives 40 samples.
-3. Keeping δξᵢ fixed, move ξ̄ to minimise the sample average (1/n) Σᵢ ℋ(d, ξ̄ + δξᵢ) with Newton-CG.
+1. Approximate $Q = \mathcal{N}(\bar{\xi}, M(\bar{\xi})^{-1})$: the covariance is *not* a free parameter; it is the inverse Fisher metric at the mean. This is what makes MGVI scale to 10⁹ parameters.
+2. Draw samples $\delta \xi_i \sim \mathcal{N}(0, M^{-1})$ with one CG solve each (as in the Wiener filter), and use **antithetic pairs** $\bar{\xi} \pm \delta \xi_i$: they cancel odd moments and halve the noise of the KL estimate. `n_samples=20` gives 40 samples.
+3. Keeping $\delta \xi_i$ fixed, move $\bar{\xi}$ to minimise the sample average $(1/n)\sum_i \mathcal{H}(d, \bar{\xi} + \delta \xi_i)$ with Newton-CG.
 4. Redraw samples at the new ξ̄ and repeat. The KL is estimated stochastically, so the mean jitters between iterations; more samples, less jitter.
 
 ### geoVI — Geometric Variational Inference
 
 geoVI starts from the MGVI samples and pushes each through a non-linear coordinate transformation derived from the metric, solved with a few Newton steps per sample. Samples then follow curved posterior shapes. It costs more (one extra non-linear solve per sample) and is more accurate. In notebook 04's banana posterior MGVI draws a straight ellipse while geoVI's samples follow the arms; started on the symmetry axis, geoVI covered both arms while MAP sat on a saddle point.
 
-&#91;embedded content: one optimize\_kl iteration · 3 solver stages\]
+&#91;embedded content: one `optimize_kl` iteration · 3 solver stages\]
 
 Each box is one solver with its own kwargs: drawing uses `draw_linear_kwargs`, bending uses `nonlinearly_update_kwargs`, moving the mean uses `kl_kwargs`.
 
@@ -394,21 +394,21 @@ The classical flavour makes geometry explicit: **domains** (`ift.RGSpace`, `ift.
 | Fisher metric M | JᵀN⁻¹J + 𝟙; NIFTy's stand-in for the Hessian and posterior precision | NB00 §11, NB01 §4 |
 | geoVI | VI with samples bent along posterior curvature | NB04 |
 | Hartley transform | Real-to-real cousin of the FFT | NB00 §5 |
-| Information Hamiltonian ℋ | −ln P(d, s); the energy NIFTy minimises | NB01 §4 |
+| Information Hamiltonian ℋ | $-\ln P(d, s)$; the energy NIFTy minimises | NB01 §4 |
 | Information propagator D | Posterior covariance of the Wiener filter | NB00 §10 |
 | Information source j | R†N⁻¹d | NB00 §10 |
 | KL divergence | Distance from the approximation Q to the posterior P | NB00 §11 |
 | Latent space ξ | Standard-normal parameters every model is written in | NB01 §2 |
-| Likelihood P(d \| s) | Probability of the data given the signal | NB00 §1, NB01 §4 |
+| Likelihood $P(d \mid s)$ | Probability of the data given the signal | NB00 §1, NB01 §4 |
 | MAP | Posterior maximum; `n_samples=0` | NB01 §5, NB04 |
 | MGVI | Gaussian VI with covariance = inverse Fisher metric | NB00 §11, NB04 |
 | Newton-CG | Newton steps solved with CG | NB00 §3 |
-| Posterior P(s \| d) | Belief after the data | NB00 §1–2 |
+| Posterior $P(s \mid d)$ | Belief after the data | NB00 §1–2 |
 | Power spectrum P(k) | Variance per Fourier mode; diagonal of a homogeneous covariance | NB00 §6 |
 | Prior P(s) | Belief before the data | NB00 §1, NB01 §2 |
 | Reduced χ² | Residual check; ≈ 1 when the model fits | NB04 §6 |
 | Response R | Map from signal to expected data | NB00 §9, NB02 §3 |
-| Standardization | Writing s = s(ξ) with ξ \~ N(0, 𝟙) | NB00 §7, NB01 §2 |
+| Standardization | Writing $s = s(\xi)$ with $\xi \sim \mathcal{N}(0, \mathbb{1})$ | NB00 §7, NB01 §2 |
 | Wiener filter | Exact posterior for linear Gaussian problems | NB00 §10, NB02, NB06 §3 |
 
 ### Capstone projects (pick one for the evening)
